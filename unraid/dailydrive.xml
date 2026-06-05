@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>dailydrive</Name>
+  <Repository>ghcr.io/aquabearco/dailydrive:latest</Repository>
+  <Registry>https://github.com/AquaBearCo/dailydrive/pkgs/container/dailydrive</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/AquaBearCo/dailydrive</Support>
+  <Project>https://github.com/AquaBearCo/dailydrive</Project>
+  <Overview>Recreates Spotify Daily Drive by refreshing a playlist with podcasts and music on a schedule.</Overview>
+  <Category>MediaApp:Music</Category>
+  <WebUI/>
+  <TemplateURL>https://raw.githubusercontent.com/AquaBearCo/dailydrive/main/unraid/dailydrive.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/patdeg/dailydrive/main/img/dailydrive.jpg</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/dailydrive" Mode="rw" Description="Persistent config, Spotify token, state, and optional .env file." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/dailydrive</Config>
+  <Config Name="Setup Port" Target="8888" Default="8888" Mode="tcp" Description="Used only while running the one-time Spotify setup command." Type="Port" Display="always" Required="false" Mask="false">8888</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/New_York" Mode="" Description="Timezone used by the scheduler." Type="Variable" Display="always" Required="true" Mask="false">America/New_York</Config>
+  <Config Name="Schedule" Target="SCHEDULE" Default="04:00,16:00" Mode="" Description="Comma-separated 24-hour refresh times, for example 04:00,16:00." Type="Variable" Display="always" Required="true" Mask="false">04:00,16:00</Config>
+  <Config Name="Run On Start" Target="RUN_ON_START" Default="false" Mode="" Description="Set to true to refresh once whenever the container starts." Type="Variable" Display="always" Required="false" Mask="false">false</Config>
+  <Config Name="Setup Bind Host" Target="SPOTIFY_SETUP_BIND_HOST" Default="0.0.0.0" Mode="" Description="Use 0.0.0.0 so the setup callback is reachable through the mapped port." Type="Variable" Display="advanced" Required="false" Mask="false">0.0.0.0</Config>
+</Container>
