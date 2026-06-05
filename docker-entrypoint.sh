@@ -5,6 +5,8 @@ APP_DIR="${APP_DIR:-/app}"
 CONFIG_DIR="${CONFIG_DIR:-/config}"
 SCHEDULE="${SCHEDULE:-04:00,16:00}"
 RUN_ON_START="${RUN_ON_START:-false}"
+ENABLE_WEB_UI="${ENABLE_WEB_UI:-true}"
+WEB_PORT="${WEB_PORT:-8911}"
 
 mkdir -p "$CONFIG_DIR"
 
@@ -19,10 +21,21 @@ run_refresh() {
   node "$APP_DIR/index.js" "$@"
 }
 
+start_web_ui() {
+  if [ "$ENABLE_WEB_UI" = "true" ] || [ "$ENABLE_WEB_UI" = "1" ]; then
+    echo "Starting DailyDrive show UI on port $WEB_PORT."
+    WEB_HOST="${WEB_HOST:-0.0.0.0}" WEB_PORT="$WEB_PORT" CONFIG_DIR="$CONFIG_DIR" node "$APP_DIR/web-ui/server.js" &
+  fi
+}
+
 case "${1:-scheduler}" in
   setup)
     shift
     exec node "$APP_DIR/setup.js" "$@"
+    ;;
+  web)
+    shift
+    exec node "$APP_DIR/web-ui/server.js" "$@"
     ;;
   start|once|run)
     shift
@@ -50,6 +63,8 @@ case "${1:-scheduler}" in
     exec "$@"
     ;;
 esac
+
+start_web_ui
 
 echo "Daily Drive scheduler started. Times: $SCHEDULE. Timezone: ${TZ:-container default}."
 
