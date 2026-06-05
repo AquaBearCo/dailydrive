@@ -12,6 +12,7 @@ const CONFIG_DIR = process.env.CONFIG_DIR || "/config";
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.yaml");
 const TOKEN_FILE = path.join(CONFIG_DIR, ".spotify-token.json");
 const SLOTS_FILE = path.join(CONFIG_DIR, "podcast-slots.yaml");
+const PUBLIC_DIR = path.join(__dirname, "public");
 const DAYS = Number(process.env.SHOW_RECENT_DAYS || "30");
 const MARKET = process.env.SPOTIFY_MARKET || "US";
 
@@ -95,20 +96,13 @@ function parseReleaseDate(value) {
 function inferSlot(show, episodes) {
   const text = `${show.name} ${show.publisher || ""} ${episodes.map((e) => e.name).join(" ")}`.toLowerCase();
   const avgDuration = episodes.reduce((sum, ep) => sum + (ep.duration_ms || 0), 0) / Math.max(episodes.length, 1);
-  const time = /\b(morning|am|a\.m\.|brief|briefing|news|headlines|daily|today|up first)\b/.test(text) || avgDuration <= 20 * 60 * 1000
-    ? "morning"
-    : "afternoon";
+  const time = /\b(morning|am|a\.m\.|brief|briefing|news|headlines|daily|today|up first)\b/.test(text) || avgDuration <= 20 * 60 * 1000 ? "morning" : "afternoon";
   return `weekday_${time}`;
 }
 
 function readSlots() {
   if (!fs.existsSync(SLOTS_FILE)) {
-    return {
-      weekday_morning: [],
-      weekday_afternoon: [],
-      weekend_morning: [],
-      weekend_afternoon: [],
-    };
+    return { weekday_morning: [], weekday_afternoon: [], weekend_morning: [], weekend_afternoon: [] };
   }
   const parsed = yaml.load(fs.readFileSync(SLOTS_FILE, "utf8")) || {};
   return {
@@ -119,14 +113,16 @@ function readSlots() {
   };
 }
 
-function saveSlots(assignments, showsById) {
-  const slots = {
-    weekday_morning: [],
-    weekday_afternoon: [],
-    weekend_morning: [],
-    weekend_afternoon: [],
-  };
+function currentAssignments() {
+  const assignments = {};
+  for (const [slot, shows] of Object.entries(readSlots())) {
+    for (const show of shows || []) assignments[show.id] = slot;
+  }
+  return assignments;
+}
 
+function saveSlots(assignments, showsById) {
+  const slots = { weekday_morning: [], weekday_afternoon: [], weekend_morning: [], weekend_afternoon: [] };
   for (const [showId, slot] of Object.entries(assignments || {})) {
     if (!slots[slot]) continue;
     const show = showsById[showId] || { id: showId, name: showId };
@@ -138,23 +134,9 @@ function saveSlots(assignments, showsById) {
       latest_release_date: show.latest_episode?.release_date || "",
     });
   }
-
-  for (const key of Object.keys(slots)) {
-    slots[key].sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  const output = yaml.dump(slots, { lineWidth: 120, noRefs: true });
-  fs.writeFileSync(SLOTS_FILE, output);
+  for (const key of Object.keys(slots)) slots[key].sort((a, b) => a.name.localeCompare(b.name));
+  fs.writeFileSync(SLOTS_FILE, yaml.dump(slots, { lineWidth: 120, noRefs: true }));
   return slots;
-}
-
-function currentAssignments() {
-  const slots = readSlots();
-  const assignments = {};
-  for (const [slot, shows] of Object.entries(slots)) {
-    for (const show of shows || []) assignments[show.id] = slot;
-  }
-  return assignments;
 }
 
 async function getShows() {
@@ -200,11 +182,7 @@ async function getShows() {
       suggested_slot: suggested,
       assigned_slot: assignments[show.id] || suggested,
       recent_episode_count: recentEpisodes.length,
-      latest_episode: {
-        name: latest.name,
-        release_date: latest.release_date,
-        duration_ms: latest.duration_ms,
-      },
+      latest_episode: { name: latest.name, release_date: latest.release_date, duration_ms: latest.duration_ms },
     });
   }
 
@@ -212,54 +190,19 @@ async function getShows() {
   return { cutoff_date: cutoff.toISOString().slice(0, 10), market: MARKET, shows };
 }
 
-function page() {
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DailyDrive Shows</title>
-<style>
-:root{--bg:#f7f8fa;--panel:#fff;--border:#d9dee7;--text:#171b22;--muted:#626b79;--accent:#1f7a4d;--accent2:#155f3a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}.shell{width:min(1500px,calc(100vw - 32px));margin:0 auto;padding:24px 0 40px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:16px}h1,h2,p{margin:0}h1{font-size:28px}h2{font-size:16px}p,.meta{color:var(--muted)}button,select{font:inherit;min-height:36px;border-radius:6px}button{border:1px solid var(--accent2);background:var(--accent);color:white;padding:8px 12px;cursor:pointer}.layout{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:14px;align-items:start}.panel,.slot,.export{background:var(--panel);border:1px solid var(--border);border-radius:8px}.panel{max-height:calc(100vh - 150px);overflow:auto}.head,.slot h2,.export h2{padding:12px 14px;border-bottom:1px solid var(--border)}.show{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}img{width:52px;height:52px;object-fit:cover;border-radius:6px;background:#eef1f5}.title{font-weight:700;margin-bottom:4px}.meta{font-size:12px;line-height:1.35}.show select{width:100%;margin-top:8px;border:1px solid var(--border);padding:0 8px;background:#fff}.slots{display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:14px}.slotBody{min-height:170px;padding:10px}.item{border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;background:#fbfcfd}.item strong{display:block;margin-bottom:4px}.notice{min-height:24px;margin:8px 0 12px;color:#8a5300}textarea{width:100%;min-height:260px;border:0;padding:14px;resize:vertical;background:#101418;color:#eef3f7;border-radius:0 0 8px 8px}@media(max-width:900px){.top,.layout{display:block}.panel{max-height:none;margin-bottom:14px}.slots{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<main class="shell">
-  <section class="top"><div><h1>DailyDrive Shows</h1><p id="summary">Load your Spotify shows, assign slots, save /config/podcast-slots.yaml.</p></div><div><button id="load">Load shows</button> <button id="save">Save slots</button></div></section>
-  <div id="notice" class="notice"></div>
-  <section class="layout">
-    <aside class="panel"><div class="head"><h2>Recent Saved Shows <span id="count">0</span></h2></div><div id="shows"></div></aside>
-    <section class="slots">
-      <div class="slot" data-slot="weekday_morning"><h2>Weekday Morning</h2><div class="slotBody"></div></div>
-      <div class="slot" data-slot="weekday_afternoon"><h2>Weekday Afternoon</h2><div class="slotBody"></div></div>
-      <div class="slot" data-slot="weekend_morning"><h2>Weekend Morning</h2><div class="slotBody"></div></div>
-      <div class="slot" data-slot="weekend_afternoon"><h2>Weekend Afternoon</h2><div class="slotBody"></div></div>
-    </section>
-  </section>
-  <section class="export"><h2>Saved YAML</h2><textarea id="yaml" spellcheck="false"></textarea></section>
-</main>
-<script>
-const labels={weekday_morning:'Weekday Morning',weekday_afternoon:'Weekday Afternoon',weekend_morning:'Weekend Morning',weekend_afternoon:'Weekend Afternoon'};
-let shows=[];let assignments={};
-const notice=document.getElementById('notice');
-function esc(v){return String(v||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}
-function mins(ms){return Math.round((ms||0)/60000)+' min'}
-async function api(path,opts={}){const res=await fetch(path,{headers:{'Content-Type':'application/json'},...opts});if(!res.ok){const err=await res.json().catch(()=>({error:res.statusText}));throw new Error(err.error||res.statusText)}return res.headers.get('content-type')?.includes('json')?res.json():res.text()}
-function renderShows(){document.getElementById('count').textContent=shows.length;document.getElementById('shows').innerHTML=shows.map(s=>{const slot=assignments[s.id]||s.assigned_slot||s.suggested_slot;return `<article class="show"><img src="${esc(s.image)}" alt=""><div><div class="title">${esc(s.name)}</div><div class="meta">${esc(s.publisher)} · ${s.recent_episode_count} recent episode(s)</div><div class="meta">${esc(s.latest_episode.name)} · ${esc(s.latest_episode.release_date)} · ${mins(s.latest_episode.duration_ms)}</div><select data-id="${esc(s.id)}">${Object.entries(labels).map(([k,v])=>`<option value="${k}" ${k===slot?'selected':''}>${v}</option>`).join('')}</select></div></article>`}).join('');for(const el of document.querySelectorAll('select[data-id]'))el.onchange=()=>{assignments[el.dataset.id]=el.value;renderSlots()}}
-function renderSlots(){for(const slotEl of document.querySelectorAll('.slot')){const slot=slotEl.dataset.slot;const items=shows.filter(s=>(assignments[s.id]||s.assigned_slot||s.suggested_slot)===slot);slotEl.querySelector('.slotBody').innerHTML=items.length?items.map(s=>`<div class="item"><strong>${esc(s.name)}</strong><div class="meta">${esc(s.id)}</div><div class="meta">${esc(s.latest_episode.release_date)} · ${esc(s.latest_episode.name)}</div></div>`).join(''):'<div class="meta">No shows assigned</div>'}}
-async function loadShows(){notice.textContent='Loading saved shows from Spotify...';const data=await api('/api/shows');shows=data.shows;assignments=Object.fromEntries(shows.map(s=>[s.id,s.assigned_slot||s.suggested_slot]));renderShows();renderSlots();notice.textContent=`Loaded ${shows.length} shows released since ${data.cutoff_date}.`}
-async function save(){notice.textContent='Saving /config/podcast-slots.yaml...';const showsById=Object.fromEntries(shows.map(s=>[s.id,s]));const data=await api('/api/slots',{method:'POST',body:JSON.stringify({assignments,showsById})});document.getElementById('yaml').value=data.yaml;notice.textContent='Saved /config/podcast-slots.yaml.'}
-document.getElementById('load').onclick=()=>loadShows().catch(e=>notice.textContent=e.message);
-document.getElementById('save').onclick=()=>save().catch(e=>notice.textContent=e.message);
-</script>
-</body>
-</html>`;
+function serveStatic(res, pathname) {
+  const requestPath = pathname === "/" ? "/index.html" : pathname;
+  const filePath = path.join(PUBLIC_DIR, path.normalize(requestPath));
+  if (!filePath.startsWith(PUBLIC_DIR)) return send(res, 403, "Forbidden");
+  if (!fs.existsSync(filePath)) return send(res, 404, "Not found");
+  const ext = path.extname(filePath);
+  const type = ext === ".css" ? "text/css" : ext === ".js" ? "text/javascript" : "text/html";
+  return send(res, 200, fs.readFileSync(filePath), type);
 }
 
 async function handle(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {
-    if (url.pathname === "/") return send(res, 200, page(), "text/html");
     if (url.pathname === "/api/shows") return sendJson(res, 200, await getShows());
     if (url.pathname === "/api/slots" && req.method === "GET") {
       const content = fs.existsSync(SLOTS_FILE) ? fs.readFileSync(SLOTS_FILE, "utf8") : yaml.dump(readSlots());
@@ -270,7 +213,7 @@ async function handle(req, res) {
       saveSlots(body.assignments || {}, body.showsById || {});
       return sendJson(res, 200, { yaml: fs.readFileSync(SLOTS_FILE, "utf8"), slots: readSlots() });
     }
-    return sendJson(res, 404, { error: "Not found" });
+    return serveStatic(res, url.pathname);
   } catch (err) {
     return sendJson(res, 500, { error: err.message });
   }
