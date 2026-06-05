@@ -64,6 +64,8 @@ const SCOPES = [
 // --- Start a tiny web server to catch the callback ---
 const app = express();
 const port = new URL(redirect_uri).port || 8888;
+const bindHost =
+  process.env.SPOTIFY_SETUP_BIND_HOST || process.env.SETUP_BIND_HOST || "127.0.0.1";
 
 app.get("/callback", async (req, res) => {
   const { code, error } = req.query;
@@ -100,13 +102,14 @@ app.get("/callback", async (req, res) => {
   }
 });
 
-// Bind to 127.0.0.1 explicitly (Spotify requires this, not "localhost")
-app.listen(port, "127.0.0.1", () => {
+app.listen(port, bindHost, () => {
   const authUrl = spotifyApi.createAuthorizeURL(SCOPES, "dailydrive");
 
   console.log("\n🎵 Daily Drive — Setup\n");
+  console.log(`Listening on ${bindHost}:${port}`);
   console.log("Open this URL in your browser to authorize:\n");
   console.log(`  ${authUrl}\n`);
+  console.log(`Make sure your Spotify app's redirect URI is set to: ${redirect_uri}\n`);
 
   // Try to open the browser automatically (works on desktop, not headless)
   import("open")
@@ -115,9 +118,6 @@ app.listen(port, "127.0.0.1", () => {
       // If running headless, user will need to copy/paste the URL
       console.log(
         "(If you're on a headless server, copy the URL above to a browser on another machine.)"
-      );
-      console.log(
-        `Make sure your Spotify app's redirect URI is set to: ${redirect_uri}\n`
       );
     });
 });
