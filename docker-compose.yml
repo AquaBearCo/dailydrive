@@ -1,0 +1,14 @@
+services:
+  dailydrive:
+    build: .
+    container_name: dailydrive
+    restart: unless-stopped
+    environment:
+      TZ: America/New_York
+      SCHEDULE: "04:00,16:00"
+      RUN_ON_START: "false"
+      SPOTIFY_SETUP_BIND_HOST: 0.0.0.0
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./config:/config
