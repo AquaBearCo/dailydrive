@@ -16,10 +16,13 @@ Or create a Docker container manually:
 Repository: ghcr.io/aquabearco/dailydrive:latest
 Network: bridge
 Appdata path: /mnt/user/appdata/dailydrive -> /config
+Show UI port: 8911 -> 8911
 Setup port: 8888 -> 8888
 TZ: your timezone, for example America/Denver
 SCHEDULE: comma-separated 24-hour times, for example 04:00,16:00
 RUN_ON_START: false
+ENABLE_WEB_UI: true
+APPLY_PODCAST_SLOTS: true
 SPOTIFY_SETUP_BIND_HOST: 0.0.0.0
 ```
 
@@ -33,7 +36,7 @@ Start the container once. It creates this file:
 /mnt/user/appdata/dailydrive/config.yaml
 ```
 
-Edit it with your Spotify client ID, client secret, playlist ID, podcasts, music settings, and schedule.
+Edit it with your Spotify client ID, client secret, playlist ID, initial podcasts, music settings, and schedule.
 
 For first-time Spotify setup, your Spotify app redirect URI must match the URI in `config.yaml`. The default is:
 
@@ -60,6 +63,39 @@ Copy the printed Spotify authorization URL into your browser. After Spotify redi
 ```text
 /mnt/user/appdata/dailydrive/.spotify-token.json
 ```
+
+## Show Organizer
+
+After setup, open the container WebUI:
+
+```text
+http://YOUR_UNRAID_IP:8911
+```
+
+Click `Load shows`. The page lists saved Spotify shows that have at least one episode released in the last 30 days.
+
+Assign each show to one of these slots:
+
+```text
+weekday_morning
+weekday_afternoon
+weekend_morning
+weekend_afternoon
+```
+
+Click `Save slots`. The container writes:
+
+```text
+/mnt/user/appdata/dailydrive/podcast-slots.yaml
+```
+
+Before each manual or scheduled refresh, the container reads `podcast-slots.yaml`, picks the current slot using `TZ`, and updates the `podcasts` section in `config.yaml`. The first time it does this, it also saves a backup:
+
+```text
+/mnt/user/appdata/dailydrive/config.yaml.before-podcast-slots
+```
+
+Morning is before `AFTERNOON_START_HOUR`, which defaults to `12`. Set `PODCAST_SLOT` to force a slot for testing, for example `weekday_morning`.
 
 ## Run Manually
 
@@ -93,4 +129,4 @@ SCHEDULE=06:30
 RUN_ON_START=true
 ```
 
-`state.json`, `.spotify-token.json`, `config.yaml`, and optional `.env` files stay in appdata so container updates do not remove them.
+`state.json`, `.spotify-token.json`, `config.yaml`, `podcast-slots.yaml`, and optional `.env` files stay in appdata so container updates do not remove them.
