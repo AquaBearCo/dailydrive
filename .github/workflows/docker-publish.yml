@@ -9,6 +9,8 @@ on:
       - package.json
       - package-lock.json
       - "*.js"
+      - "scripts/**"
+      - "web-ui/**"
       - config.example.yaml
       - .github/workflows/docker-publish.yml
   workflow_dispatch:
