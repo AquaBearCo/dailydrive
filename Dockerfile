@@ -14,6 +14,7 @@ ENV NODE_ENV=production \
     RUN_ON_START=false \
     ENABLE_WEB_UI=true \
     WEB_PORT=8911 \
+    APPLY_PODCAST_SLOTS=true \
     SPOTIFY_SETUP_BIND_HOST=0.0.0.0
 
 VOLUME ["/config"]
