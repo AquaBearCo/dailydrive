@@ -7,6 +7,7 @@ SCHEDULE="${SCHEDULE:-04:00,16:00}"
 RUN_ON_START="${RUN_ON_START:-false}"
 ENABLE_WEB_UI="${ENABLE_WEB_UI:-true}"
 WEB_PORT="${WEB_PORT:-8911}"
+APPLY_PODCAST_SLOTS="${APPLY_PODCAST_SLOTS:-true}"
 
 mkdir -p "$CONFIG_DIR"
 
@@ -18,6 +19,9 @@ fi
 cd "$CONFIG_DIR"
 
 run_refresh() {
+  if [ "$APPLY_PODCAST_SLOTS" = "true" ] || [ "$APPLY_PODCAST_SLOTS" = "1" ]; then
+    CONFIG_DIR="$CONFIG_DIR" node "$APP_DIR/scripts/apply-podcast-slot.js" || true
+  fi
   node "$APP_DIR/index.js" "$@"
 }
 
@@ -39,15 +43,18 @@ case "${1:-scheduler}" in
     ;;
   start|once|run)
     shift
-    exec node "$APP_DIR/index.js" "$@"
+    run_refresh "$@"
+    exit $?
     ;;
   test|dry-run)
     shift
-    exec node "$APP_DIR/index.js" --dry-run "$@"
+    run_refresh --dry-run "$@"
+    exit $?
     ;;
   podcast-only)
     shift
-    exec node "$APP_DIR/index.js" --podcast-only "$@"
+    run_refresh --podcast-only "$@"
+    exit $?
     ;;
   taste)
     shift
