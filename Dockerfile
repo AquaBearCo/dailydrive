@@ -12,10 +12,12 @@ ENV NODE_ENV=production \
     CONFIG_DIR=/config \
     SCHEDULE=04:00,16:00 \
     RUN_ON_START=false \
+    ENABLE_WEB_UI=true \
+    WEB_PORT=8911 \
     SPOTIFY_SETUP_BIND_HOST=0.0.0.0
 
 VOLUME ["/config"]
-EXPOSE 8888
+EXPOSE 8888 8911
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["scheduler"]
