@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log*
+.git
+.github
+.env
+.env.*
+config.yaml
+config.yml
+.spotify-token.json
+spotify-token.json
+state.json
+*.log
+logs
+docs
+.claude
+.DS_Store
+Thumbs.db
