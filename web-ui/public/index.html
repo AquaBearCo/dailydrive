@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DailyDrive Shows</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <h1>DailyDrive Shows</h1>
+          <p id="summary">Load saved Spotify shows, assign slots, save /config/podcast-slots.yaml.</p>
+        </div>
+        <div class="actions">
+          <button id="loadShowsBtn" type="button">Load shows</button>
+          <button id="saveSlotsBtn" type="button">Save slots</button>
+        </div>
+      </section>
+
+      <section class="notice" id="notice"></section>
+
+      <section class="layout">
+        <aside class="showList">
+          <div class="listHeader">
+            <h2>Recent Saved Shows</h2>
+            <span id="showCount">0</span>
+          </div>
+          <div id="shows"></div>
+        </aside>
+
+        <section class="slots">
+          <div class="slot" data-slot="weekday_morning"><h2>Weekday Morning</h2><div class="slotBody"></div></div>
+          <div class="slot" data-slot="weekday_afternoon"><h2>Weekday Afternoon</h2><div class="slotBody"></div></div>
+          <div class="slot" data-slot="weekend_morning"><h2>Weekend Morning</h2><div class="slotBody"></div></div>
+          <div class="slot" data-slot="weekend_afternoon"><h2>Weekend Afternoon</h2><div class="slotBody"></div></div>
+        </section>
+      </section>
+
+      <section class="exportPanel">
+        <h2>Saved YAML</h2>
+        <textarea id="exportText" spellcheck="false"></textarea>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
