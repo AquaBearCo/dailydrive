@@ -5,6 +5,7 @@ APP_DIR="${APP_DIR:-/app}"
 CONFIG_DIR="${CONFIG_DIR:-/config}"
 SCHEDULE="${SCHEDULE:-04:00,16:00}"
 RUN_ON_START="${RUN_ON_START:-false}"
+RUN_ON_START_ARGS="${RUN_ON_START_ARGS:---all-profiles}"
 ENABLE_WEB_UI="${ENABLE_WEB_UI:-true}"
 WEB_PORT="${WEB_PORT:-8911}"
 APPLY_PODCAST_SLOTS="${APPLY_PODCAST_SLOTS:-true}"
@@ -76,8 +77,9 @@ start_web_ui
 echo "Daily Drive scheduler started. Times: $SCHEDULE. Timezone: ${TZ:-container default}."
 
 if [ "$RUN_ON_START" = "true" ] || [ "$RUN_ON_START" = "1" ]; then
-  echo "RUN_ON_START enabled; refreshing now."
-  run_refresh || true
+  echo "RUN_ON_START enabled; refreshing now with args: $RUN_ON_START_ARGS"
+  # shellcheck disable=SC2086
+  run_refresh $RUN_ON_START_ARGS || true
 fi
 
 last_run=""
