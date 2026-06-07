@@ -23,6 +23,7 @@ config.local.*
 .env.production
 .env.staging
 .env.development
+!.env.example
 
 # Generic secrets patterns
 *.pem
