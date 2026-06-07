@@ -21,6 +21,7 @@ Setup port: 8890 -> 8888
 TZ: your timezone, for example America/Denver
 SCHEDULE: comma-separated 24-hour times, for example 04:00,16:00
 RUN_ON_START: false
+RUN_ON_START_ARGS: --all-profiles
 ENABLE_WEB_UI: true
 APPLY_PODCAST_SLOTS: true
 SPOTIFY_SETUP_BIND_HOST: 0.0.0.0
@@ -111,10 +112,44 @@ Dry run without changing Spotify:
 /app/docker-entrypoint.sh dry-run
 ```
 
+Dry run one named profile:
+
+```bash
+/app/docker-entrypoint.sh dry-run --profile weekday_morning
+```
+
+Refresh every configured profile that has a real playlist ID:
+
+```bash
+/app/docker-entrypoint.sh once --all-profiles
+```
+
 Refresh podcasts only:
 
 ```bash
 /app/docker-entrypoint.sh podcast-only
+```
+
+## Multiple Playlist Profiles
+
+`config.yaml` can define `profiles` for separate playlists, schedules, podcast lists, music settings, and mix patterns. Example profile names:
+
+```text
+weekday_morning
+weekday_afternoon
+weekday_evening
+weekend_morning
+weekend_afternoon
+podcast_explorer
+```
+
+The scheduler checks `refresh_times` and `days` for each profile. Placeholder playlist IDs like `your-weekday-afternoon-playlist-id-here` are skipped until replaced with a real Spotify playlist ID.
+
+Set this to refresh all wired profiles whenever the container starts:
+
+```text
+RUN_ON_START=true
+RUN_ON_START_ARGS=--all-profiles
 ```
 
 ## Scheduler
