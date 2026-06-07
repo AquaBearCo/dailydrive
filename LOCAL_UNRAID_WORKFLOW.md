@@ -70,6 +70,8 @@ Open the printed Spotify authorization URL in the workstation browser that has t
 docker compose ps
 docker compose logs -f dailydrive
 docker exec -it dailydrive /app/docker-entrypoint.sh dry-run
+docker exec -it dailydrive /app/docker-entrypoint.sh dry-run --profile weekday_morning
+docker exec -it dailydrive /app/docker-entrypoint.sh dry-run --all-profiles
 docker exec -it dailydrive /app/docker-entrypoint.sh once
 docker exec -it dailydrive /app/docker-entrypoint.sh podcast-only
 ```
@@ -79,6 +81,16 @@ Web UI:
 ```text
 http://YOUR_UNRAID_IP:8911
 ```
+
+Profile commands:
+
+```bash
+docker exec -it dailydrive /app/docker-entrypoint.sh dry-run --profile weekday_morning
+docker exec -it dailydrive /app/docker-entrypoint.sh once --profile podcast_explorer
+docker exec -it dailydrive /app/docker-entrypoint.sh once --all-profiles
+```
+
+If `RUN_ON_START=true`, the container uses `RUN_ON_START_ARGS`, which defaults to `--all-profiles`, so restarts refresh every configured profile that has a real playlist ID.
 
 ## Optional Taste Profile API Keys
 
