@@ -88,6 +88,7 @@ Profile commands:
 docker exec -it dailydrive /app/docker-entrypoint.sh dry-run --profile weekday_morning
 docker exec -it dailydrive /app/docker-entrypoint.sh once --profile podcast_explorer
 docker exec -it dailydrive /app/docker-entrypoint.sh once --all-profiles
+docker exec -it dailydrive /app/docker-entrypoint.sh create-profile-playlists
 ```
 
 If `RUN_ON_START=true`, the container uses `RUN_ON_START_ARGS`, which defaults to `--all-profiles`, so restarts refresh every configured profile that has a real playlist ID.
