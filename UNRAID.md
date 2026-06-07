@@ -124,6 +124,12 @@ Refresh every configured profile that has a real playlist ID:
 /app/docker-entrypoint.sh once --all-profiles
 ```
 
+Create any missing profile playlists and write their IDs back to `config.yaml`:
+
+```bash
+/app/docker-entrypoint.sh create-profile-playlists
+```
+
 Refresh podcasts only:
 
 ```bash
