@@ -57,6 +57,10 @@ case "${1:-scheduler}" in
     run_refresh --podcast-only "$@"
     exit $?
     ;;
+  create-profile-playlists)
+    shift
+    exec node "$APP_DIR/scripts/create-profile-playlists.js" "$@"
+    ;;
   taste)
     shift
     exec node "$APP_DIR/taste-profile.js" "$@"
