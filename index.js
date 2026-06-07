@@ -27,6 +27,14 @@ const STATE_FILE = "state.json";           // Caches last run's episode URIs to 
 const DRY_RUN = process.argv.includes("--dry-run");       // Shows what would happen without changing the playlist
 const PODCAST_ONLY = process.argv.includes("--podcast-only"); // Hourly mode: only refresh podcasts, reuse saved music
 
+function getArgValue(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : null;
+}
+
+const REQUESTED_PROFILE = getArgValue("--profile");
+const ALL_PROFILES = process.argv.includes("--all-profiles");
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -167,6 +175,42 @@ async function fetchPodcastEpisodes(spotifyApi, podcasts) {
   return episodes;
 }
 
+async function fetchExplorerEpisodes(spotifyApi, podcasts, options = {}) {
+  const pool = [];
+  const recentPool = options.recent_pool || 5;
+  const limit = options.episode_count || Math.min(podcasts.length, 6);
+
+  for (const podcast of podcasts) {
+    const count = podcast.recent_pool || podcast.episodes || recentPool;
+    console.log(`🎙️  Exploring ${count} recent episode(s) from: ${podcast.name}`);
+
+    try {
+      const data = await spotifyApi.getShowEpisodes(podcast.id, {
+        limit: count,
+        market: "US",
+      });
+
+      for (const episode of data.body.items) {
+        pool.push({
+          uri: episode.uri,
+          name: episode.name,
+          show: podcast.name,
+          type: "episode",
+          position: podcast.position || null,
+        });
+      }
+    } catch (err) {
+      console.error(`    ⚠️  Failed to fetch ${podcast.name}: ${err.message}`);
+    }
+  }
+
+  const selected = shuffle(pool).slice(0, limit);
+  for (const episode of selected) {
+    console.log(`    🎲 [${episode.show}] ${episode.name}`);
+  }
+  return selected;
+}
+
 /**
  * Fetches music tracks from two "familiar" sources:
  *   1. Source playlists — songs from playlists you specify in config.yaml
@@ -277,7 +321,7 @@ async function fetchMusicTracks(spotifyApi, musicConfig) {
   }
 
   // Shuffle and trim to the desired total number of songs
-  const totalSongs = musicConfig.total_songs || 15;
+  const totalSongs = musicConfig.total_songs ?? 15;
   if (musicConfig.shuffle !== false) {
     allTracks = shuffle(allTracks);
   }
@@ -440,12 +484,147 @@ async function updatePlaylist(spotifyApi, playlistId, items) {
   console.log(`   🎵 ${items.filter((i) => i.type === "track").length} songs\n`);
 }
 
+function isPlaceholderPlaylistId(value) {
+  return !value || value === "your-playlist-id-here" || value === "your-playlist-id" || /^your-.*playlist-id/.test(value);
+}
+
+function currentTimeParts() {
+  const now = new Date();
+  const day = now.getDay();
+  return {
+    time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+    isWeekend: day === 0 || day === 6,
+  };
+}
+
+function dayMatches(days, isWeekend) {
+  if (!days || days === "all") return true;
+  const normalized = Array.isArray(days) ? days : [days];
+  if (normalized.includes("all")) return true;
+  if (normalized.includes("weekday") && !isWeekend) return true;
+  if (normalized.includes("weekend") && isWeekend) return true;
+  return false;
+}
+
+function buildLegacyProfile(config) {
+  return {
+    name: "default",
+    playlist_id: config.playlist_id,
+    podcasts: config.podcasts || [],
+    music: config.music || {},
+    mix_pattern: config.mix_pattern || "PMMM",
+    enabled: true,
+  };
+}
+
+function normalizeProfiles(config) {
+  if (!config.profiles) return [buildLegacyProfile(config)];
+
+  return Object.entries(config.profiles).map(([key, profile]) => ({
+    key,
+    name: profile.name || key,
+    enabled: profile.enabled !== false,
+    mode: profile.mode || "daily_drive",
+    playlist_id: profile.playlist_id,
+    days: profile.days || "all",
+    refresh_times: profile.refresh_times || [],
+    podcasts: profile.podcasts || config.podcasts || [],
+    explorer: profile.explorer || {},
+    music: profile.music === undefined ? (config.music || {}) : profile.music,
+    mix_pattern: profile.mix_pattern || config.mix_pattern || "PMMM",
+  }));
+}
+
+function selectProfiles(config) {
+  const profiles = normalizeProfiles(config).filter((profile) => profile.enabled);
+  const requested = REQUESTED_PROFILE;
+
+  if (requested) {
+    const profile = profiles.find((item) => item.key === requested || item.name === requested);
+    if (!profile) {
+      console.error(`❌ Profile not found: ${requested}`);
+      process.exit(1);
+    }
+    return [profile];
+  }
+
+  if (ALL_PROFILES || !config.profiles) return profiles;
+
+  const { time, isWeekend } = currentTimeParts();
+  const due = profiles.filter((profile) => {
+    if (!dayMatches(profile.days, isWeekend)) return false;
+    return (profile.refresh_times || []).includes(time);
+  });
+
+  if (due.length === 0) {
+    console.log(`⏭️  No profiles scheduled for ${time}. Use --profile <name> or --all-profiles for a manual run.`);
+  }
+
+  return due;
+}
+
+function shouldFetchMusic(profile) {
+  if (profile.mode === "podcast_explorer") return false;
+  if (!profile.music) return false;
+  if (profile.music.enabled === false) return false;
+  if (profile.music.total_songs === 0) return false;
+  return true;
+}
+
+function profileStateKey(profile) {
+  return profile.key || profile.name || "default";
+}
+
+async function buildProfileItems(spotifyApi, profile, state) {
+  let episodes;
+  if (profile.mode === "podcast_explorer") {
+    episodes = await fetchExplorerEpisodes(spotifyApi, profile.podcasts || [], profile.explorer || {});
+  } else {
+    episodes = await fetchPodcastEpisodes(spotifyApi, profile.podcasts || []);
+  }
+
+  const currentEpisodeUris = episodes.map((e) => e.uri).sort().join(",");
+  const previousEpisodeUris = state.episode_uris || "";
+
+  if (!DRY_RUN && PODCAST_ONLY && currentEpisodeUris === previousEpisodeUris && episodes.length > 0) {
+    return { skipped: true, reason: "No new podcast episodes detected", episodes, tracks: [], mixed: [] };
+  }
+
+  let tracks = [];
+  if (shouldFetchMusic(profile)) {
+    if (PODCAST_ONLY && state.music_tracks && state.music_tracks.length > 0) {
+      tracks = state.music_tracks;
+      console.log(`🎵 Reusing ${tracks.length} saved music tracks from last full refresh`);
+    } else {
+      if (PODCAST_ONLY) console.log("⚠️  No saved music tracks found — falling back to full music fetch");
+      tracks = await fetchAllMusicTracks(spotifyApi, profile);
+    }
+  }
+
+  if (episodes.length === 0 && tracks.length === 0) {
+    return { skipped: true, reason: "No content found", episodes, tracks, mixed: [] };
+  }
+
+  const pinnedFirst = [];
+  const mixableEpisodes = [];
+  for (const ep of episodes) {
+    if (ep.position === "first") {
+      pinnedFirst.push(ep);
+    } else {
+      mixableEpisodes.push(ep);
+    }
+  }
+
+  console.log(`\n🔀 Mixing with pattern: ${profile.mix_pattern || "PMMM"}`);
+  const mixed = [...pinnedFirst, ...mixContent(mixableEpisodes, tracks, profile.mix_pattern)];
+  return { skipped: false, episodes, tracks, mixed, currentEpisodeUris };
+}
+
 // =============================================================================
 // Main — Entry point that orchestrates everything
 // =============================================================================
 
 async function main() {
-  const mode = PODCAST_ONLY ? "podcast-only" : "full";
   console.log(`\n🚗 Daily Drive — ${PODCAST_ONLY ? "Hourly podcast refresh" : "Full playlist rebuild"}...\n`);
 
   // Step 1: Load configuration and authentication token
@@ -466,94 +645,41 @@ async function main() {
   // Step 3: Refresh the access token if it's about to expire
   await refreshTokenIfNeeded(spotifyApi, token);
 
-  // Step 4: Make sure the user has set a real playlist ID
-  if (!config.playlist_id || config.playlist_id === "your-playlist-id-here") {
-    console.error("❌ Please set your playlist_id in config.yaml");
-    process.exit(1);
-  }
+  const profiles = selectProfiles(config);
+  if (profiles.length === 0) return;
 
-  // Step 5: Fetch the latest podcast episodes
-  const episodes = await fetchPodcastEpisodes(spotifyApi, config.podcasts || []);
+  const rootState = loadState();
+  rootState.profiles = rootState.profiles || {};
 
-  // Step 6: Check if episodes have changed since last run
-  // This prevents unnecessary playlist updates that would reset your listening position
-  const state = loadState();
-  const currentEpisodeUris = episodes.map((e) => e.uri).sort().join(",");
-  const previousEpisodeUris = state.episode_uris || "";
+  for (const profile of profiles) {
+    console.log(`\n=== Profile: ${profile.name} ===`);
 
-  // In podcast-only mode, skip if episodes haven't changed (no point reshuffling)
-  // In full refresh mode, ALWAYS proceed — we want fresh music even if podcasts are the same
-  if (!DRY_RUN && PODCAST_ONLY && currentEpisodeUris === previousEpisodeUris && episodes.length > 0) {
-    console.log("\n⏭️  No new podcast episodes detected. Playlist unchanged.");
-    console.log("   (Same episodes as last update — skipping to avoid disruption)\n");
-    process.exit(0);
-  }
-
-  // Step 7: Get music tracks
-  let tracks;
-
-  if (PODCAST_ONLY) {
-    // --- Podcast-only mode (hourly) ---
-    // Reuse the music tracks saved from the last full refresh.
-    // This keeps your music stable all day while swapping in fresh podcast episodes.
-    if (state.music_tracks && state.music_tracks.length > 0) {
-      tracks = state.music_tracks;
-      console.log(`🎵 Reusing ${tracks.length} saved music tracks from last full refresh`);
-    } else {
-      // No saved music — fall back to a full music fetch
-      // This happens on the very first run, or if state.json was deleted
-      console.log("⚠️  No saved music tracks found — falling back to full music fetch");
-      tracks = await fetchAllMusicTracks(spotifyApi, config);
-    }
-  } else {
-    // --- Full refresh mode (daily) ---
-    // Fetch fresh music from all sources (top tracks, playlists, genre discovery)
-    tracks = await fetchAllMusicTracks(spotifyApi, config);
-  }
-
-  if (episodes.length === 0 && tracks.length === 0) {
-    console.error("❌ No content found! Check your config.yaml settings.");
-    process.exit(1);
-  }
-
-  // Step 8: Separate pinned episodes (position: "first") from mixable ones
-  // Pinned episodes go at the very top of the playlist, before the mix pattern starts
-  const pinnedFirst = [];
-  const mixableEpisodes = [];
-  for (const ep of episodes) {
-    if (ep.position === "first") {
-      pinnedFirst.push(ep);
-    } else {
-      mixableEpisodes.push(ep);
-    }
-  }
-
-  // Step 9: Mix podcasts and music according to the configured pattern
-  console.log(`\n🔀 Mixing with pattern: ${config.mix_pattern || "PMMM"}`);
-  const mixed = [...pinnedFirst, ...mixContent(mixableEpisodes, tracks, config.mix_pattern)];
-
-  // Step 10: Push the final mixed playlist to Spotify
-  await updatePlaylist(spotifyApi, config.playlist_id, mixed);
-
-  // Step 11: Save state so the next run can detect if episodes have changed
-  if (!DRY_RUN) {
-    const newState = {
-      episode_uris: currentEpisodeUris,
-      last_updated: new Date().toISOString(),
-    };
-
-    if (PODCAST_ONLY) {
-      // In podcast-only mode, preserve the saved music tracks from the full refresh
-      newState.music_tracks = state.music_tracks || tracks;
-      newState.last_full_refresh = state.last_full_refresh || null;
-    } else {
-      // In full refresh mode, save the music tracks for hourly podcast-only runs to reuse
-      newState.music_tracks = tracks;
-      newState.last_full_refresh = new Date().toISOString();
+    if (isPlaceholderPlaylistId(profile.playlist_id)) {
+      console.log(`⏭️  Skipping ${profile.name}: playlist_id is not set.`);
+      continue;
     }
 
-    saveState(newState);
-    console.log("💾 State saved to state.json");
+    const key = profileStateKey(profile);
+    const state = rootState.profiles[key] || {};
+    const result = await buildProfileItems(spotifyApi, profile, state);
+
+    if (result.skipped) {
+      console.log(`\n⏭️  ${result.reason}. Playlist unchanged.\n`);
+      continue;
+    }
+
+    await updatePlaylist(spotifyApi, profile.playlist_id, result.mixed);
+
+    if (!DRY_RUN) {
+      rootState.profiles[key] = {
+        episode_uris: result.currentEpisodeUris,
+        last_updated: new Date().toISOString(),
+        music_tracks: PODCAST_ONLY ? (state.music_tracks || result.tracks) : result.tracks,
+        last_full_refresh: PODCAST_ONLY ? (state.last_full_refresh || null) : new Date().toISOString(),
+      };
+      saveState(rootState);
+      console.log(`💾 State saved for ${profile.name}`);
+    }
   }
 }
 
@@ -564,7 +690,7 @@ async function main() {
  */
 async function fetchAllMusicTracks(spotifyApi, config) {
   const musicConfig = config.music || {};
-  const totalSongs = musicConfig.total_songs || 15;
+  const totalSongs = musicConfig.total_songs ?? 15;
   const hasGenres = musicConfig.genres && musicConfig.genres.length > 0;
 
   // When genres are configured, split total_songs 50/50:
