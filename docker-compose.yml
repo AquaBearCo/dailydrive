@@ -17,6 +17,7 @@ services:
       TZ: ${TZ:-America/New_York}
       SCHEDULE: ${SCHEDULE:-04:00,16:00}
       RUN_ON_START: ${RUN_ON_START:-false}
+      RUN_ON_START_ARGS: ${RUN_ON_START_ARGS:---all-profiles}
       ENABLE_WEB_UI: ${ENABLE_WEB_UI:-true}
       WEB_PORT: ${WEB_PORT:-8911}
       APPLY_PODCAST_SLOTS: ${APPLY_PODCAST_SLOTS:-true}
