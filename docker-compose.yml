@@ -1,14 +1,29 @@
 services:
   dailydrive:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local/dailydrive:latest
     container_name: dailydrive
     restart: unless-stopped
+
+    labels:
+      net.unraid.docker.managed: 'composeman'
+      net.unraid.docker.icon: 'https://raw.githubusercontent.com/AquaBearCo/dailydrive/main/img/dailydrive.jpg'
+      net.unraid.docker.webui: 'http://[IP]:8911'
+      net.unraid.docker.shell: 'sh'
+
     environment:
-      TZ: America/New_York
-      SCHEDULE: "04:00,16:00"
-      RUN_ON_START: "false"
-      SPOTIFY_SETUP_BIND_HOST: 0.0.0.0
+      TZ: ${TZ:-America/New_York}
+      SCHEDULE: ${SCHEDULE:-04:00,16:00}
+      RUN_ON_START: ${RUN_ON_START:-false}
+      ENABLE_WEB_UI: ${ENABLE_WEB_UI:-true}
+      WEB_PORT: ${WEB_PORT:-8911}
+      APPLY_PODCAST_SLOTS: ${APPLY_PODCAST_SLOTS:-true}
+      SPOTIFY_SETUP_BIND_HOST: ${SPOTIFY_SETUP_BIND_HOST:-0.0.0.0}
+      WEB_HOST: ${WEB_HOST:-0.0.0.0}
     ports:
-      - "8888:8888"
+      - "${SPOTIFY_SETUP_HOST_PORT:-8890}:8888"
+      - "8911:8911"
     volumes:
-      - ./config:/config
+      - /mnt/user/appdata/dailydrive:/config
