@@ -17,7 +17,7 @@ Repository: ghcr.io/aquabearco/dailydrive:latest
 Network: bridge
 Appdata path: /mnt/user/appdata/dailydrive -> /config
 Show UI port: 8911 -> 8911
-Setup port: 8888 -> 8888
+Setup port: 8890 -> 8888
 TZ: your timezone, for example America/Denver
 SCHEDULE: comma-separated 24-hour times, for example 04:00,16:00
 RUN_ON_START: false
@@ -44,10 +44,10 @@ For first-time Spotify setup, your Spotify app redirect URI must match the URI i
 http://127.0.0.1:8888/callback
 ```
 
-If you run setup from a different computer than the Unraid host, use an SSH tunnel so `127.0.0.1:8888` on your computer forwards to Unraid port `8888`:
+If you run setup from a different computer than the Unraid host, use an SSH tunnel so `127.0.0.1:8888` on your computer forwards to Unraid port `8890`:
 
 ```bash
-ssh -L 8888:127.0.0.1:8888 root@YOUR_UNRAID_IP
+ssh -L 8888:127.0.0.1:8890 root@YOUR_UNRAID_IP
 ```
 
 ## One-Time Spotify Login
