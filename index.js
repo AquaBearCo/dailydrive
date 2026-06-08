@@ -177,6 +177,7 @@ async function fetchPodcastEpisodes(spotifyApi, podcasts) {
 
 async function fetchExplorerEpisodes(spotifyApi, podcasts, options = {}) {
   const pool = [];
+  const pinned = [];
   const recentPool = options.recent_pool || 5;
   const limit = options.episode_count || Math.min(podcasts.length, 6);
 
@@ -190,21 +191,26 @@ async function fetchExplorerEpisodes(spotifyApi, podcasts, options = {}) {
         market: "US",
       });
 
-      for (const episode of data.body.items) {
-        pool.push({
+      for (const [index, episode] of data.body.items.entries()) {
+        const entry = {
           uri: episode.uri,
           name: episode.name,
           show: podcast.name,
           type: "episode",
           position: podcast.position || null,
-        });
+        };
+        if (podcast.position === "first" && index === 0) {
+          pinned.push(entry);
+        } else {
+          pool.push(entry);
+        }
       }
     } catch (err) {
       console.error(`    ⚠️  Failed to fetch ${podcast.name}: ${err.message}`);
     }
   }
 
-  const selected = shuffle(pool).slice(0, limit);
+  const selected = [...pinned, ...shuffle(pool).slice(0, Math.max(0, limit - pinned.length))];
   for (const episode of selected) {
     console.log(`    🎲 [${episode.show}] ${episode.name}`);
   }
